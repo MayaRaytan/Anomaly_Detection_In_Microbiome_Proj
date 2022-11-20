@@ -18,17 +18,6 @@ from sklearn.ensemble import IsolationForest
 from sklearn.metrics import PrecisionRecallDisplay
 
 
-
-'''
-Notes:
-1. Getting an error in skin of nose:
-    relative abundance function, sum all row
-    TypeError: unsupported operand type(s) for +: 'int' and 'str'
-    
-4. temporal data
-'''
-
-
 class Tree_Node:
     def __init__(self, depth=0, left=None, right=None, split_att=None, split_val=None, size=0, samples=[]):
         self.depth = depth
