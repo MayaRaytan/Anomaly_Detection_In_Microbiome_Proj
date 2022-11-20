@@ -148,17 +148,23 @@ def test_groups_by_depths(A, B, OF):
 
 
 def kde(A_depths, B_depths, title, file_name):
-    all_A = []
-    for lst in A_depths:
-        for m in lst:
-            all_A.append(m)
-    all_B = []
-    for lst in B_depths:
-        for m in lst:
-            all_B.append(m)
+    print(A_depths)
+    print(B_depths)
+    if type(A_depths[0]) == list:
+        all_A = []
+        for lst in A_depths:
+            for m in lst:
+                all_A.append(m)
+        all_B = []
+        for lst in B_depths:
+            for m in lst:
+                all_B.append(m)
+    all_A = A_depths
+    all_B = B_depths
     sns.kdeplot(data=all_A, label='anomalies')
     sns.kdeplot(data=all_B, label='normals')
     plt.title(title)
+    plt.legend()
     plt.show()
     plt.savefig(file_name)
 
@@ -228,7 +234,7 @@ def write_list_of_lists_to_file(file_name, lst):
                 outfile.write("]")
             else:
                 outfile.write("],")
-        # outfile.write("]\n")
+        outfile.write("]\n")
     outfile.close()
 
 
@@ -240,7 +246,7 @@ def anomalies_against_normals(anomalies_data, normals_data, t, psi, outliers_per
     # data = data.T.drop_duplicates().T
 
     outliers_count = int(outliers_percentage * len(normals_samples) / (100 - outliers_percentage))
-    l = int(math.log(len(normals_data)+outliers_count,2))
+    l = int(math.log(len(normals_samples)+outliers_count,2))
 
     A_depths, B_depths, compare_depths, auc_lst, auc_IF, p, auc_p_r, auc_IF_p_r = [], [], [], [], [], [], [], []
 
@@ -291,7 +297,9 @@ def anomalies_against_normals(anomalies_data, normals_data, t, psi, outliers_per
     if times > 1:
         A_depths = [item for sublist in A_depths for item in sublist]
         B_depths = [item for sublist in B_depths for item in sublist]
-
+    else:
+        A_depths = A_depths[0]
+        B_depths = B_depths[0]
     kde(A_depths,B_depths, dir_name + " - depths kde", dir_name + "kde")
 
     return A_depths, B_depths, compare_depths, p, auc_lst, auc_IF, auc_p_r, auc_IF_p_r
@@ -327,5 +335,5 @@ t = 10
 psi = 2000
 outliers_percentage = 5
 dir_name = "bacth effect- healthy schubert and vincent"
-times = 10
+times = 1
 anomalies_against_normals(healthy_vincent_data, healthy_schubert_data, t, psi, outliers_percentage, dir_name, times)
