@@ -6,9 +6,9 @@ import matplotlib.pyplot as plt
 import random
 import sklearn
 #from sklearn.preprocessing import StandardScaler
-#from skbio import DistanceMatrix ####relative abundance / bray curtis
-#from skbio.stats.ordination import pcoa #####pca
-#from skbio.diversity import beta_diversity
+# from skbio import DistanceMatrix ####relative abundance / bray curtis
+# from skbio.stats.ordination import pcoa #####pca
+# from skbio.diversity import beta_diversity
 import seaborn as sns
 #import statannot
 from scipy.stats import mannwhitneyu
@@ -64,7 +64,6 @@ def omri_tree(X, OTUs, e, l, psi, distance_matrix, random_state=0):
         return Tree_Node(depth=e, size=len(X), samples=X.columns)
 
     else:
-
         if len(X) < psi:
             sampled_X = X
         else:
@@ -74,10 +73,7 @@ def omri_tree(X, OTUs, e, l, psi, distance_matrix, random_state=0):
 
         # distance_mat = beta_diversity(distance_matrix, renormalized_X, ids)
         distance_mat = renormalized_X
-        #not sure if it's needed
-        #sc = StandardScaler()
-        #sc.fit(distance_mat)
-        #distance_mat_std = sc.transform(distance_mat)
+
         #print(distance_mat_std.isnull())
         #pc1 = pcoa(distance_mat).samples[['PC1']] ####????? extract 1st pcoa
 
@@ -148,8 +144,6 @@ def test_groups_by_depths(A, B, OF):
 
 
 def kde(A_depths, B_depths, title, file_name):
-    print(A_depths)
-    print(B_depths)
     if type(A_depths[0]) == list:
         all_A = []
         for lst in A_depths:
@@ -161,12 +155,14 @@ def kde(A_depths, B_depths, title, file_name):
                 all_B.append(m)
     all_A = A_depths
     all_B = B_depths
-    sns.kdeplot(data=all_A, label='anomalies')
+    sns.kdeplot(data=all_A, label='outliers')
     sns.kdeplot(data=all_B, label='normals')
     plt.title(title)
+    plt.xlabel("depths")
     plt.legend()
-    plt.show()
     plt.savefig(file_name)
+    plt.show()
+
 
 def create_data(data):
     data, OTUs = filter_samples(data)
@@ -214,7 +210,7 @@ def write_list_to_file(file_name, lst):
         # outfile.write(title + "\n")
         outfile.write("[")
         outfile.write("".join(str(item) + ", " for item in lst))
-        # outfile.write("]\n")
+        outfile.write("]\n")
     outfile.close()
 
 def write_list_of_lists_to_file(file_name, lst):
@@ -300,7 +296,7 @@ def anomalies_against_normals(anomalies_data, normals_data, t, psi, outliers_per
     else:
         A_depths = A_depths[0]
         B_depths = B_depths[0]
-    kde(A_depths,B_depths, dir_name + " - depths kde", dir_name + "kde")
+    kde(A_depths,B_depths, dir_name + " - depths kde", dir_name + "/kde")
 
     return A_depths, B_depths, compare_depths, p, auc_lst, auc_IF, auc_p_r, auc_IF_p_r
 
@@ -311,8 +307,9 @@ def create_dir(dir_name):
         os.mkdir(dir_name)
 
 
-schubert_data = load_dataset("C:/Maya/CS/AnomalyDetectionMicrobiome/Diseases/schubert/RDP/cdi_schubert.otu_table.100.denovo.rdp_assigned")
-schubert_metadata = pd.read_csv("C:/Maya/CS/AnomalyDetectionMicrobiome/Diseases/schubert/cdi_schubert.metadata.txt",sep='\t', encoding= 'unicode_escape')
+schubert_data = load_dataset("Diseases/schubert/RDP/cdi_schubert.otu_table.100.denovo.rdp_assigned")
+# print(schubert_data)
+schubert_metadata = pd.read_csv("Diseases/schubert/cdi_schubert.metadata.txt",sep='\t', encoding= 'unicode_escape')
 schubert_data.rename(columns={"Unnamed: 0": "#SampleID"}, inplace=True)
 schubert_metadata.rename(columns={"sample_id": "#SampleID"}, inplace=True)
 schubert_metadata = schubert_metadata[schubert_metadata["DiseaseState"] != "nonCDI"]
@@ -320,20 +317,53 @@ schubert_metadata = schubert_metadata[schubert_metadata["#SampleID"] != 'DA00939
 healthy_schubert_metadata = schubert_metadata[schubert_metadata["DiseaseState"] == "H"]
 healthy_schubert_data = schubert_data[healthy_schubert_metadata["#SampleID"]]
 
-vincent_data = load_dataset("C:/Maya/CS/AnomalyDetectionMicrobiome/Diseases/vincent/RDP/cdi_vincent_v3v5.otu_table.100.denovo.rdp_assigned")
-vincent_metadata = load_dataset("C:/Maya/CS/AnomalyDetectionMicrobiome/Diseases/vincent/cdi_vincent_v3v5.metadata.txt")
+vincent_data = load_dataset("Diseases/vincent/RDP/cdi_vincent_v3v5.otu_table.100.denovo.rdp_assigned")
+# print(vincent_data)
+vincent_metadata = load_dataset("Diseases/vincent/cdi_vincent_v3v5.metadata.txt")
 vincent_data.rename(columns={"Unnamed: 0": "#SampleID"}, inplace=True)
 vincent_metadata.rename(columns={"Unnamed: 0": "#SampleID"}, inplace=True)
 healthy_vincent_metadata = vincent_metadata[vincent_metadata["DiseaseState"] == "H"]
 healthy_vincent_data = vincent_data[healthy_vincent_metadata["#SampleID"]]
 
-# print(healthy_schubert_data)
+
+
+# print(pd.Series(list(set(vincent_data.iloc[:, 0]).intersection(set(schubert_data.iloc[:, 0])))))
 # print(healthy_vincent_data)
 
 
 t = 10
 psi = 2000
 outliers_percentage = 5
-dir_name = "bacth effect- healthy schubert and vincent"
-times = 1
-anomalies_against_normals(healthy_vincent_data, healthy_schubert_data, t, psi, outliers_percentage, dir_name, times)
+times = 50
+dir_name = str(times) + " times bacth effect- healthy schubert and vincent " + str(t) + " trees " + str(outliers_percentage) + "% of outliers " + str(psi) + " sub sample"
+
+
+# anomalies_against_normals(healthy_vincent_data, healthy_schubert_data, t, psi, outliers_percentage, dir_name, times)
+
+
+def box_plot_hue(auc, auc_IF, title):
+    df = pd.DataFrame()
+    auc_df = pd.DataFrame()
+    auc_df["model"] = ["Omri Tree" for j in range(len(auc))]
+    auc_df["auc"] = auc
+    auc_df["y"] = "y"
+    df = pd.concat([df, auc_df], ignore_index=True)
+    auc_IF_df = pd.DataFrame()
+    auc_IF_df["model"] = ["Isolation Forest" for j in range(len(auc_IF))]
+    auc_IF_df["auc"] = auc_IF
+    auc_IF_df["y"] = "y"
+    df = pd.concat([df, auc_IF_df], ignore_index=True)
+
+    print(df)
+    sns.boxplot(data=df, x="auc",y="y", hue="model").set(title=title)
+    # plt.axvline(x=0.95, color='g')
+    plt.xlim(0.9,1)
+    plt.tight_layout()
+    plt.savefig(title)
+    plt.show()
+
+
+
+auc_IF_pre_rec = [0.9696944052135748, 0.9674607637610482, 0.9622278986155608, 0.9514865880662584, 0.9680248086737087, 0.9441970930707154, 0.9585491163575185, 0.9519511227669526, 0.9627575403717404, 0.976114775203089, 0.9533271779851913, 0.9395491585945356, 0.9250287227911411, 0.9510106091420222, 0.9633815940345751, 0.9833776139007698, 0.9397271864881851, 0.9758346361761985, 0.9657846618597272, 0.9504452645562891, 0.9412258872990222, 0.9461337173794842, 0.9384337781654057, 0.9667769101406456, 0.9294829914661473, 0.9649421426648626, 0.9587297807263643, 0.9356473733299392, 0.9756004679020635, 0.9365340583822299, 0.9339523511815424, 0.9745465695296507, 0.9611601612534955, 0.9446620499984197, 0.9651004273664223, 0.9404927039395821, 0.9650130046027262, 0.9621462910746436, 0.9652761780859248, 0.9604141958962176, 0.9488825158596407, 0.9469509575679356, 0.9620043034206598, 0.9550377804840569, 0.9660451977110975, 0.9524459361981363, 0.9317507651318204, 0.9653077635491293, 0.9485281882887024, 0.9652077166683417]
+auc_pre_recall = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+box_plot_hue(auc_pre_recall, auc_IF_pre_rec, "auc precision-recall - " + dir_name)
