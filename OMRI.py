@@ -1,12 +1,13 @@
 import sys
 import pandas as pd
 from sklearn.decomposition import PCA
+import matplotlib
 import matplotlib.pyplot as plt
 import random
 #from sklearn.preprocessing import StandardScaler
-# from skbio import DistanceMatrix ####relative abundance / bray curtis
-# from skbio.stats.ordination import pcoa #####pca
-# from skbio.diversity import beta_diversity
+from skbio import DistanceMatrix ####relative abundance / bray curtis
+from skbio.stats.ordination import pcoa #####pca
+from skbio.diversity import beta_diversity
 import seaborn as sns
 #import statannot
 from scipy.stats import mannwhitneyu
@@ -76,9 +77,10 @@ def omri_tree(X, e, l, psi, distance_matrix=None, random_state=0):
         renormalized_X = relative_abundence(sampled_X)
 
         if distance_matrix != "No":
-            renormalized_X.to_csv("/specific/elhanan/PROJECTS/ANOMALY_DETECTION_OP/mat4beta.txt", index=False)
             distance_mat = beta_diversity(distance_matrix, renormalized_X.T, renormalized_X.columns)
-            print(distance_mat)
+            distance_mat.to_csv("/specific/elhanan/PROJECTS/ANOMALY_DETECTION_OP/distanceMat.txt", index=False)
+
+            print(len(distance_mat), len(distance_mat[0]))
 
         distance_mat = renormalized_X
 
@@ -90,10 +92,11 @@ def omri_tree(X, e, l, psi, distance_matrix=None, random_state=0):
         if distance_matrix != "No":
             pc1 = pcoa(distance_mat, number_of_dimensions=1)
             print(pc1)
-        pca = PCA(n_components=1)
+        else:
+            pca = PCA(n_components=1)
+            pc1 = pca.fit_transform(distance_mat.transpose())
 
         #pc1 = pca.fit_transform(distance_mat_std.transpose())
-        pc1 = pca.fit_transform(distance_mat.transpose())
 
         # print("explained variance ratio", pca.explained_variance_ratio_)
         # print("var", pca.explained_variance_)
@@ -181,7 +184,6 @@ def kde(title, file_name, B_depths, A_depths=[]):
     plt.xlabel("depths")
     plt.tight_layout()
     plt.savefig(file_name, bbox_inches='tight')
-    plt.show()
 
 
 def create_data(data):
@@ -274,7 +276,6 @@ def box_plot_hue(auc, auc_IF, title, dir_name):
     plt.tight_layout()
     plt.title(title)
     plt.savefig(dir_name + '/' + title)
-    plt.show()
 
 
 def create_dir(dir_name):
@@ -348,7 +349,6 @@ def outliers_against_normals(outliers_data, normals_data,l, t, psi, outliers_per
     return A_depths, B_depths, compare_depths, p, auc_lst, auc_IF, auc_p_r, auc_IF_p_r
 
 
-
 # change features to genius level only
 def genius_level(str):
     i = str[::-1].find(";", 0, len(str))
@@ -368,10 +368,11 @@ def unsupervised_test(times, data, psi, l, t, distance_matrix, dir_name):
         OF = Forest(0, [])
         OF.fit(data, psi, l, t, distance_matrix)
         A_depths, now_B_depths = test_groups_by_depths([], samples, OF) # A_depths = []
-        df[i] = now_B_depths
+        df[str(i)] = now_B_depths
         all_depths += now_B_depths
     title = "unsupervised test, " + str(times) + " times " + str(t) + " trees " + str(psi) + " sub-sample  " + str(l) + " depth limit"
     df.to_csv(dir_name + "/depths in each iteration.txt", sep='\t')
+    print(df)
     #test
     kde(title, dir_name, now_B_depths, A_depths)  # A_depths = []
 
@@ -399,7 +400,7 @@ elif len(sys.argv) == 8:
     l = int(sys.argv[4])
     times = int(sys.argv[5])
     data = load_dataset(sys.argv[6]).iloc[:, 2:]
-    dir_name = sys.argv[7] + str(times) + " times " + str(t) + " trees " + str(psi) + " sub sample" + str(l) + " depth limit"
+    dir_name = sys.argv[7] + " " + str(times) + " times " + str(t) + " trees " + str(psi) + " sub sample " + str(l) + " depth limit"
     create_dir(dir_name)
     unsupervised_test(times, data, psi, l, t, distance_matrix, dir_name)
 
