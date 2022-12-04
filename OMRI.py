@@ -1,10 +1,8 @@
-import math
-import numpy as np
+import sys
 import pandas as pd
 from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
 import random
-import sklearn
 #from sklearn.preprocessing import StandardScaler
 # from skbio import DistanceMatrix ####relative abundance / bray curtis
 # from skbio.stats.ordination import pcoa #####pca
@@ -12,10 +10,8 @@ import sklearn
 import seaborn as sns
 #import statannot
 from scipy.stats import mannwhitneyu
-from sklearn.metrics import roc_auc_score, precision_recall_curve
-from sklearn.metrics import auc
+from sklearn.metrics import roc_auc_score, precision_recall_curve, auc
 from sklearn.ensemble import IsolationForest
-from sklearn.metrics import PrecisionRecallDisplay
 import os
 
 
@@ -41,9 +37,9 @@ class Forest:
         function: Creates forest of omriTrees.
         output: an omriForest
     '''
-    def fit(self, X, OTUs, psi, l, t=100, distance_matrix="de_brui"):
+    def fit(self, X, psi, l, t=100, distance_matrix="de_brui"):
         for i in range(t):
-            self.trees.append(omri_tree(X, OTUs, 0, l, psi, distance_matrix, 0))
+            self.trees.append(omri_tree(X, 0, l, psi, distance_matrix, 0))
             self.number_of_trees += 1
 
 
@@ -52,7 +48,7 @@ class Forest:
     function:
     output: an omriTree represented by it's root (treeNode type)
 '''
-def omri_tree(X, OTUs, e, l, psi, distance_matrix, random_state=0):
+def omri_tree(X, e, l, psi, distance_matrix=None, random_state=0):
     #np.random.seed(0)
 
     X = filter_features(X) # remove features with few data
@@ -79,8 +75,11 @@ def omri_tree(X, OTUs, e, l, psi, distance_matrix, random_state=0):
 
         renormalized_X = relative_abundence(sampled_X)
 
+        if distance_matrix != "No":
+            renormalized_X.to_csv("/specific/elhanan/PROJECTS/ANOMALY_DETECTION_OP/mat4beta.txt", index=False)
+            distance_mat = beta_diversity(distance_matrix, renormalized_X.T, renormalized_X.columns)
+            print(distance_mat)
 
-        # distance_mat = beta_diversity(distance_matrix, renormalized_X, ids)
         distance_mat = renormalized_X
 
         #print(distance_mat_std.isnull())
@@ -88,6 +87,9 @@ def omri_tree(X, OTUs, e, l, psi, distance_matrix, random_state=0):
 
         # if (distance_mat.sum(axis=0) <= 0).any() or distance_mat.sum(axis=1).any() <= 0:
         #     print(distance_mat)
+        if distance_matrix != "No":
+            pc1 = pcoa(distance_mat, number_of_dimensions=1)
+            print(pc1)
         pca = PCA(n_components=1)
 
         #pc1 = pca.fit_transform(distance_mat_std.transpose())
@@ -105,8 +107,8 @@ def omri_tree(X, OTUs, e, l, psi, distance_matrix, random_state=0):
         right_pc = [i for i in range(len(pc1)) if pc1[i][0] > t]
         X_left = X.iloc[:, left_pc]
         X_right = X.iloc[:, right_pc]
-        left = omri_tree(X_left, OTUs, e+1, l, psi, distance_matrix, random_state + 1)
-        right = omri_tree(X_right, OTUs, e+1, l, psi, distance_matrix, random_state + 1)
+        left = omri_tree(X_left, e+1, l, psi, distance_matrix, random_state + 1)
+        right = omri_tree(X_right, e+1, l, psi, distance_matrix, random_state + 1)
 
         return Tree_Node(depth=e, left=left, right=right, split_att=pc1, split_val=t, size=len(sampled_X.columns), samples=X.columns)
 
@@ -152,26 +154,30 @@ def test_groups_by_depths(A, B, OF):
     return A_depths, B_depths
 
 
-def kde(A_depths, B_depths, title, file_name):
-    if type(A_depths[0]) == list:
-        all_A = []
-        for lst in A_depths:
-            for m in lst:
-                all_A.append(m)
-        all_B = []
-        for lst in B_depths:
-            for m in lst:
-                all_B.append(m)
+def kde(title, file_name, B_depths, A_depths=None):
+    if A_depths == None:
+        sns.kdeplot(data=B_depths)
     else:
-        all_A = A_depths
-        all_B = B_depths
-    sns.kdeplot(data=all_A, label='outliers')
-    sns.kdeplot(data=all_B, label='normals')
+        if type(A_depths[0]) == list:
+            all_A = []
+            for lst in A_depths:
+                for m in lst:
+                    all_A.append(m)
+            all_B = []
+            for lst in B_depths:
+                for m in lst:
+                    all_B.append(m)
+        else:
+            all_A = A_depths
+            all_B = B_depths
+        sns.kdeplot(data=all_A, label='outliers')
+        sns.kdeplot(data=all_B, label='normals')
+        plt.legend()
+
     plt.title(title)
     plt.xlabel("depths")
-    plt.legend()
     plt.tight_layout()
-    plt.savefig(file_name)
+    plt.savefig(file_name, bbox_inches='tight')
     plt.show()
 
 
@@ -261,9 +267,10 @@ def box_plot_hue(auc, auc_IF, title, dir_name):
     # print(df)
     sns.boxplot(data=df, x="auc",y="y", hue="model").set(title=title)
     # plt.axvline(x=0.95, color='g')
-    plt.xlim(0,1)
+    plt.xlim(0.5,1)
     plt.tight_layout()
-    plt.savefig(dir_name + title)
+    plt.title(title)
+    plt.savefig(dir_name + '/' + title)
     plt.show()
 
 
@@ -272,38 +279,38 @@ def create_dir(dir_name):
         os.mkdir(dir_name)
 
 
-def anomalies_against_normals(anomalies_data, normals_data, t, psi, outliers_percentage, dir_name, times):
+def outliers_against_normals(outliers_data, normals_data,l, t, psi, outliers_percentage, distance_matrix, dir_name, times, title):
 
-    anomalies_data = anomalies_data.loc[:, anomalies_data.sum() > 0] # filter samples with no data
+    outliers_data = outliers_data.loc[:, outliers_data.sum() > 0] # filter samples with no data
 
     normals_data = normals_data.loc[:, normals_data.sum() > 0]
     normals_samples = normals_data.columns
     # data = data.T.drop_duplicates().T
 
     outliers_count = int(outliers_percentage * len(normals_samples) / (100 - outliers_percentage))
-    l = int(math.log(len(normals_samples)+outliers_count,2))
-    print(l)
+    # l = int(math.log(len(normals_samples)+outliers_count,2)+ 20)
+    # print(l)
 
     A_depths, B_depths, compare_depths, auc_lst, auc_IF, p, auc_p_r, auc_IF_p_r = [], [], [], [], [], [], [], []
 
     for i in range(times):
-        anomalies_data = anomalies_data.sample(n=outliers_count, axis=1)
-        anomalies_samples = anomalies_data.columns
-        data = concat_data_frames([normals_data, anomalies_data], 1)
+        outliers_data = outliers_data.sample(n=outliers_count, axis=1)
+        outliers_samples = outliers_data.columns
+        data = concat_data_frames([normals_data, outliers_data], 1)
         data = relative_abundence(data)
 
         OF = Forest(0,[])
-        OF.fit(data, [], psi, l,t)
+        OF.fit(data, psi, l,t, distance_matrix=distance_matrix)
 
         # Test
-        now_A_depths, now_B_depths = test_groups_by_depths(anomalies_samples,normals_data, OF)
+        now_A_depths, now_B_depths = test_groups_by_depths(outliers_samples,normals_data, OF)
         A_depths.append(now_A_depths)
         B_depths.append(now_B_depths)
         cd = (sum(now_A_depths) / len(now_A_depths)) < (sum(now_B_depths) / len(now_B_depths))
         compare_depths.append(cd)
         U1, now_p = mannwhitneyu(now_A_depths, now_B_depths, alternative="less")
         p.append(now_p)
-        y_true = len(normals_samples) * [1] + len(anomalies_samples) * [0]
+        y_true = len(normals_samples) * [1] + len(outliers_samples) * [0]
         auc_lst.append(roc_auc_score(y_true, now_B_depths + now_A_depths))
         depths = now_B_depths + now_A_depths
         precision, recall, thresholds = precision_recall_curve(y_true, depths)
@@ -333,18 +340,9 @@ def anomalies_against_normals(anomalies_data, normals_data, t, psi, outliers_per
     else:
         A_depths = A_depths[0]
         B_depths = B_depths[0]
-    kde(A_depths,B_depths, dir_name + " - depths kde", dir_name + "/kde")
+    kde(title + "\ndepths kde", dir_name + "/kde",B_depths, A_depths)
     box_plot_hue(auc_p_r, auc_IF_p_r, "auc Precision-Recall OMRI vs Isolation Forest", dir_name)
     return A_depths, B_depths, compare_depths, p, auc_lst, auc_IF, auc_p_r, auc_IF_p_r
-
-# df.to_csv
-
-
-
-
-
-
-
 
 
 
@@ -353,61 +351,43 @@ def genius_level(str):
     i = str[::-1].find(";", 0, len(str))
     i = str[::-1].find(";", i + 1, len(str))
     return str[:len(str) - i]
+#
 
-schubert_data = load_dataset("Diseases/schubert/RDP/cdi_schubert.otu_table.100.denovo.rdp_assigned")
-schubert_metadata = pd.read_csv("Diseases/schubert/cdi_schubert.metadata.txt",sep='\t', encoding= 'unicode_escape')
-schubert_metadata.rename(columns={"sample_id": "#SampleID"}, inplace=True)
-schubert_metadata = schubert_metadata[schubert_metadata["DiseaseState"] != "nonCDI"]
-schubert_metadata = schubert_metadata[schubert_metadata["#SampleID"] != 'DA00939']
-schubert_data.iloc[:, 0] = schubert_data.iloc[:, 0].apply(genius_level)
-schubert_data.rename(columns={"Unnamed: 0": "#SampleID"}, inplace=True)
-healthy_schubert_metadata = schubert_metadata[schubert_metadata["DiseaseState"] == "H"]
+# outliers_against_normals(healthy_vincent_data, healthy_schubert_data, l, t, psi, outliers_percentage, distance_matrix, dir_name, times, title)
 
-
-vincent_data = load_dataset("Diseases/vincent/RDP/cdi_vincent_v3v5.otu_table.100.denovo.rdp_assigned")
-vincent_metadata = load_dataset("Diseases/vincent/cdi_vincent_v3v5.metadata.txt")
-healthy_vincent_metadata = vincent_metadata[vincent_metadata["DiseaseState"] == "H"]
-healthy_vincent_metadata.rename(columns={"Unnamed: 0": "#SampleID"}, inplace=True)
-
-vincent_data.iloc[:, 0] = vincent_data.iloc[:, 0].apply(genius_level)
-vincent_data.rename(columns={"Unnamed: 0": "#SampleID"}, inplace=True)
+def unsupervised_test(times, data, psi, l, t, distance_matrix, dir_name):
+    data = relative_abundence(data)
+    for i in range(times):
+        OF = Forest(0, [])
+        OF.fit(data, psi, l, t, distance_matrix)
+    title = "unsupervised test, " + str(times) + "times " + str(t) + " trees" + str(psi) + " sub-sample " + str(l) + " depth limit"
+    kde(title, title, data, A_depths=None)
 
 
-common_features = pd.Series(list(set(vincent_data["#SampleID"]).intersection(set(schubert_data["#SampleID"]))))
-vincent_data = vincent_data[vincent_data.iloc[:, 0].isin(common_features)]
-schubert_data = schubert_data[schubert_data.iloc[:, 0].isin(common_features)]
+# python3, distance_matrix=None, t, psi, outliers_percentage, l, time, data1(normal), data2(outliers) optional!, dir_name
+if len(sys.argv) == 10:
+    distance_matrix = sys.argv[1]
+    t = int(sys.argv[2])
+    psi = int(sys.argv[3])
+    outliers_percentage = int(sys.argv[4])
+    l = int(sys.argv[5])
+    times = int(sys.argv[6])
+    normal_data = load_dataset(sys.argv[7]).iloc[:, 1:]
+    outliers_data = load_dataset(sys.argv[8]).iloc[:, 1:]
+    dir_name = sys.argv[9] + "\n" + str(times) + " times " + str(t) + " trees " + str(outliers_percentage) + "% of outliers " + str(psi) + " sub sample" + str(l) + " depth limit"
+    outliers_against_normals(outliers_data, normal_data, l, t, psi, outliers_percentage,distance_matrix,dir_name, times, dir_name)
 
-schubert_data = schubert_data.groupby(["#SampleID"]).sum().reset_index()
-vincent_data = vincent_data.groupby(['#SampleID']).sum().reset_index()
-
-healthy_schubert_data = schubert_data[healthy_schubert_metadata["#SampleID"]]
-healthy_vincent_data = vincent_data[healthy_vincent_metadata["#SampleID"]]
-
-
-# common_features = pd.Series(list(set(healthy_vincent_data.iloc[:, 0]).intersection(set(healthy_schubert_data.iloc[:, 0]))))
-# healthy_vincent_data = healthy_vincent_data[healthy_vincent_data.iloc[:, 0].isin(common_features)].reset_index()
-# healthy_schubert_data = healthy_schubert_data[healthy_schubert_data.iloc[:, 0].isin(common_features)].iloc[:,1:]
-# print(healthy_vincent_data)
-# # print(vincent_data.iloc[:, 1:])
-# old_sum = vincent_data.iloc[:, 1:].sum()
-# # print(old_sum)
-# vincent_data = vincent_data[vincent_data["#SampleID"].isin(common_features)]
-# # print(vincent_data)
-# new_sum = vincent_data.iloc[:, 1:].sum()
-# print(new_sum/old_sum)
-
-
-t = 50
-psi = 30
-outliers_percentage = 5
-times = 30
-dir_name = str(times) + " times bacth effect- healthy schubert and vincent " + str(t) + " trees " + str(outliers_percentage) + "% of outliers " + str(psi) + " sub sample"
-
-
-anomalies_against_normals(healthy_vincent_data, healthy_schubert_data, t, psi, outliers_percentage, dir_name, times)
-
-
-
+# python3, distance_matrix=None, t, psi, outliers_percentage, l, dir_name, time, data, dir_name
+elif len(sys.argv) == 9:
+    distance_matrix = sys.argv[1]
+    t = int(sys.argv[2])
+    psi = int(sys.argv[3])
+    outliers_percentage = int(sys.argv[4])
+    l = int(sys.argv[5])
+    times = int(sys.argv[6])
+    data = load_dataset(sys.argv[7]).iloc[:, 1:]
+    dir_name = sys.argv[8] + str(times) + str(t) + " trees " + str(outliers_percentage) + "% of outliers " + str(psi) + " sub sample" + str(l) + " depth limit"
+    unsupervised_test(times, data, psi, l, t, distance_matrix, dir_name)
 
 
 
