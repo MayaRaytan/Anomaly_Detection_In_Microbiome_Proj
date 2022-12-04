@@ -154,22 +154,25 @@ def test_groups_by_depths(A, B, OF):
     return A_depths, B_depths
 
 
-def kde(title, file_name, B_depths, A_depths=None):
-    if A_depths == None:
+def kde(title, file_name, B_depths, A_depths=[]):
+    if (A_depths != []) and (type(A_depths[0]) == list):
+        all_A = []
+        for lst in A_depths:
+            for m in lst:
+                all_A.append(m)
+    else:
+        all_A = A_depths
+    if type(B_depths[0]) == list:
+        all_B = []
+        for lst in B_depths:
+            for m in lst:
+                all_B.append(m)
+    else:
+        all_B = B_depths
+
+    if all_A == []:
         sns.kdeplot(data=B_depths)
     else:
-        if type(A_depths[0]) == list:
-            all_A = []
-            for lst in A_depths:
-                for m in lst:
-                    all_A.append(m)
-            all_B = []
-            for lst in B_depths:
-                for m in lst:
-                    all_B.append(m)
-        else:
-            all_A = A_depths
-            all_B = B_depths
         sns.kdeplot(data=all_A, label='outliers')
         sns.kdeplot(data=all_B, label='normals')
         plt.legend()
@@ -357,11 +360,21 @@ def genius_level(str):
 
 def unsupervised_test(times, data, psi, l, t, distance_matrix, dir_name):
     data = relative_abundence(data)
+    df = pd.DataFrame()
+    samples = data.columns
+    df["samples"] = samples
+    all_depths = []
     for i in range(times):
         OF = Forest(0, [])
         OF.fit(data, psi, l, t, distance_matrix)
-    title = "unsupervised test, " + str(times) + "times " + str(t) + " trees" + str(psi) + " sub-sample " + str(l) + " depth limit"
-    kde(title, title, data, A_depths=None)
+        A_depths, now_B_depths = test_groups_by_depths([], samples, OF) # A_depths = []
+        df[i] = now_B_depths
+        all_depths += now_B_depths
+    title = "unsupervised test, " + str(times) + " times " + str(t) + " trees " + str(psi) + " sub-sample  " + str(l) + " depth limit"
+    df.to_csv(dir_name + "/depths in each iteration.txt", sep='\t')
+    #test
+    kde(title, dir_name, now_B_depths, A_depths)  # A_depths = []
+
 
 
 # python3, distance_matrix=None, t, psi, outliers_percentage, l, time, data1(normal), data2(outliers) optional!, dir_name
@@ -374,19 +387,20 @@ if len(sys.argv) == 10:
     times = int(sys.argv[6])
     normal_data = load_dataset(sys.argv[7]).iloc[:, 1:]
     outliers_data = load_dataset(sys.argv[8]).iloc[:, 1:]
-    dir_name = sys.argv[9] + "\n" + str(times) + " times " + str(t) + " trees " + str(outliers_percentage) + "% of outliers " + str(psi) + " sub sample" + str(l) + " depth limit"
-    outliers_against_normals(outliers_data, normal_data, l, t, psi, outliers_percentage,distance_matrix,dir_name, times, dir_name)
+    dir_name = sys.argv[9] + str(times) + " times " + str(t) + " trees " + str(outliers_percentage) + "% of outliers " + str(psi) + " sub sample" + str(l) + " depth limit"
+    title = sys.argv[9] + "\n" + str(times) + " times " + str(t) + " trees " + str(outliers_percentage) + "% of outliers " + str(psi) + " sub sample" + str(l) + " depth limit"
+    outliers_against_normals(outliers_data, normal_data, l, t, psi, outliers_percentage,distance_matrix,dir_name, times, title)
 
-# python3, distance_matrix=None, t, psi, outliers_percentage, l, dir_name, time, data, dir_name
-elif len(sys.argv) == 9:
+# python3, distance_matrix=None, t, psi, l, times, data, dir_name
+elif len(sys.argv) == 8:
     distance_matrix = sys.argv[1]
     t = int(sys.argv[2])
     psi = int(sys.argv[3])
-    outliers_percentage = int(sys.argv[4])
-    l = int(sys.argv[5])
-    times = int(sys.argv[6])
-    data = load_dataset(sys.argv[7]).iloc[:, 1:]
-    dir_name = sys.argv[8] + str(times) + str(t) + " trees " + str(outliers_percentage) + "% of outliers " + str(psi) + " sub sample" + str(l) + " depth limit"
+    l = int(sys.argv[4])
+    times = int(sys.argv[5])
+    data = load_dataset(sys.argv[6]).iloc[:, 2:]
+    dir_name = sys.argv[7] + str(times) + " times " + str(t) + " trees " + str(psi) + " sub sample" + str(l) + " depth limit"
+    create_dir(dir_name)
     unsupervised_test(times, data, psi, l, t, distance_matrix, dir_name)
 
 
