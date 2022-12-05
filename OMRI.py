@@ -5,9 +5,9 @@ import matplotlib
 import matplotlib.pyplot as plt
 import random
 #from sklearn.preprocessing import StandardScaler
-from skbio import DistanceMatrix ####relative abundance / bray curtis
-from skbio.stats.ordination import pcoa #####pca
-from skbio.diversity import beta_diversity
+# from skbio import DistanceMatrix ####relative abundance / bray curtis
+# from skbio.stats.ordination import pcoa #####pca
+# from skbio.diversity import beta_diversity
 import seaborn as sns
 #import statannot
 from scipy.stats import mannwhitneyu
@@ -78,9 +78,8 @@ def omri_tree(X, e, l, psi, distance_matrix=None, random_state=0):
 
         if distance_matrix != "No":
             distance_mat = beta_diversity(distance_matrix, renormalized_X.T, renormalized_X.columns)
-            distance_mat.to_csv("/specific/elhanan/PROJECTS/ANOMALY_DETECTION_OP/distanceMat.txt", index=False)
-
-            print(len(distance_mat), len(distance_mat[0]))
+            # distance_mat.to_csv("/specific/elhanan/PROJECTS/ANOMALY_DETECTION_OP/distanceMat.txt", index=False)
+            print(distance_mat.shape)
 
         distance_mat = renormalized_X
 
@@ -272,7 +271,7 @@ def box_plot_hue(auc, auc_IF, title, dir_name):
     # print(df)
     sns.boxplot(data=df, x="auc",y="y", hue="model").set(title=title)
     # plt.axvline(x=0.95, color='g')
-    plt.xlim(0.5,1)
+    plt.xlim(0.8,1)
     plt.tight_layout()
     plt.title(title)
     plt.savefig(dir_name + '/' + title)
@@ -297,9 +296,14 @@ def outliers_against_normals(outliers_data, normals_data,l, t, psi, outliers_per
 
     A_depths, B_depths, compare_depths, auc_lst, auc_IF, p, auc_p_r, auc_IF_p_r = [], [], [], [], [], [], [], []
 
+    df_outliers = pd.DataFrame()
+    df_normals = pd.DataFrame()
+
     for i in range(times):
         outliers_data = outliers_data.sample(n=outliers_count, axis=1)
         outliers_samples = outliers_data.columns
+        df_outliers["samples"] = outliers_samples
+        df_normals["samples"] = normals_samples
         data = concat_data_frames([normals_data, outliers_data], 1)
         data = relative_abundence(data)
 
@@ -308,6 +312,8 @@ def outliers_against_normals(outliers_data, normals_data,l, t, psi, outliers_per
 
         # Test
         now_A_depths, now_B_depths = test_groups_by_depths(outliers_samples,normals_data, OF)
+        df_normals[str(i)] = now_B_depths
+        df_outliers[str(i)] = now_A_depths
         A_depths.append(now_A_depths)
         B_depths.append(now_B_depths)
         cd = (sum(now_A_depths) / len(now_A_depths)) < (sum(now_B_depths) / len(now_B_depths))
@@ -329,6 +335,8 @@ def outliers_against_normals(outliers_data, normals_data,l, t, psi, outliers_per
         auc_IF_p_r.append(auc(recall_IF, precision_IF))
 
     create_dir(dir_name)
+    df_normals.to_csv(dir_name + "/normals depths in each iteration.txt", sep='\t')
+    df_outliers.to_csv(dir_name + "/outliers depths in each iteration.txt", sep='\t')
     write_list_to_file(dir_name + "/anomalies depths", A_depths)
     write_list_to_file(dir_name + "/normal depths", B_depths)
     write_list_to_file(dir_name + "/compare depths", compare_depths)
@@ -374,7 +382,7 @@ def unsupervised_test(times, data, psi, l, t, distance_matrix, dir_name):
     df.to_csv(dir_name + "/depths in each iteration.txt", sep='\t')
     print(df)
     #test
-    kde(title, dir_name, now_B_depths, A_depths)  # A_depths = []
+    kde(title, dir_name + "/kde", now_B_depths, A_depths)  # A_depths = []
 
 
 
@@ -388,8 +396,8 @@ if len(sys.argv) == 10:
     times = int(sys.argv[6])
     normal_data = load_dataset(sys.argv[7]).iloc[:, 1:]
     outliers_data = load_dataset(sys.argv[8]).iloc[:, 1:]
-    dir_name = sys.argv[9] + str(times) + " times " + str(t) + " trees " + str(outliers_percentage) + "% of outliers " + str(psi) + " sub sample" + str(l) + " depth limit"
-    title = sys.argv[9] + "\n" + str(times) + " times " + str(t) + " trees " + str(outliers_percentage) + "% of outliers " + str(psi) + " sub sample" + str(l) + " depth limit"
+    dir_name = sys.argv[9] + str(times) + " times " + str(t) + " trees " + str(outliers_percentage) + "% of outliers " + str(psi) + " sub sample " + str(l) + " depth limit"
+    title = sys.argv[9] + "\n" + str(times) + " times " + str(t) + " trees " + str(outliers_percentage) + "% of outliers " + str(psi) + " sub sample " + str(l) + " depth limit"
     outliers_against_normals(outliers_data, normal_data, l, t, psi, outliers_percentage,distance_matrix,dir_name, times, title)
 
 # python3, distance_matrix=None, t, psi, l, times, data, dir_name
