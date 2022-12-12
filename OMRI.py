@@ -372,7 +372,7 @@ def unsupervised_test(times, data, psi, l, t, distance_matrix, dir_name):
     kde(title, dir_name + "/kde", now_B_depths, A_depths)  # A_depths = []
 
 
-def contamination_test(time, contamination_percentage, basic_data, contaminating_data, outliers_percentage_sample):
+def contamination_test(times, contamination_percentage, basic_data, contaminating_data, outliers_percentage_sample, dir_name):
 
     # filter to common features
     features_intersection = pd.Series(list(set(basic_data["#OTU ID"]).intersection(set(contaminating_data["#OTU ID"]))))
@@ -410,7 +410,7 @@ def contamination_test(time, contamination_percentage, basic_data, contaminating
         basic_data = basic_data[a]
 
         normals_samples = basic_data.columns
-        outliers_samples = helper_contaminating.outliers
+        outliers_samples = helper_contaminating.columns
         df_outliers["samples"] = outliers_samples
         df_normals["samples"] = normals_samples
         data = concat_data_frames([basic_data, helper_contaminating], 1)
@@ -420,12 +420,19 @@ def contamination_test(time, contamination_percentage, basic_data, contaminating
 
         df_normals[str(i)] = B_depths
         df_outliers[str(i)] = A_depths
-        df_scores = df_scores.concat([df_scores.DataFrame([p], columns=['p'])])
-        df_scores = df_scores.concat([df_scores.DataFrame([auc], columns=['auc'])])
-        df_scores = df_scores.concat([df_scores.DataFrame([auc_IF], columns=['auc_IF'])])
-        df_scores = df_scores.concat([df_scores.DataFrame([auc_p_r], columns=['auc_p_r'])])
-        df_scores = df_scores.concat([df_scores.DataFrame([auc_IF_p_r], columns=['auc_IF_p_r'])])
-        df_scores = df_scores.concat([df_scores.DataFrame([compare_depths], columns=['compare_depths'])])
+        help = pd.DataFrame([p], columns=['p'])
+        df_scores = pd.concat([df_scores, help], axis=0)
+        help = pd.DataFrame([auc], columns=['auc'])
+        df_scores = pd.concat([df_scores, help], axis=0)
+        help = pd.DataFrame([auc_IF], columns=['auc_IF'])
+        df_scores = pd.concat([df_scores, help], axis=0)
+        help = pd.DataFrame([auc_p_r], columns=['auc_p_r'])
+        df_scores = pd.concat([df_scores, help], axis=0)
+        help = pd.DataFrame([auc_IF_p_r], columns=['auc_IF_p_r'])
+        df_scores = pd.concat([df_scores, help], axis=0)
+        help = pd.DataFrame([compare_depths], columns=['compare_depths'])
+        df_scores = pd.concat([df_scores, help], axis=0)
+
         # df_scores[p] = p
         # df_scores[auc_IF] = auc_IF
         # df_scores[auc] = auc
@@ -433,12 +440,17 @@ def contamination_test(time, contamination_percentage, basic_data, contaminating
         # df_scores[auc_IF_p_r] = auc_IF_p_r
         # df_scores[compare_depths] = compare_depths
 
+
     df_normals.to_csv(dir_name + "/normals depths in each iteration.txt", sep='\t')
     df_outliers.to_csv(dir_name + "/outliers depths in each iteration.txt", sep='\t')
     df_scores.to_csv(dir_name + "/scores.txt", sep='\t')
 
-    all_A_depths = df_normals.stack().tolist()
-    all_B_depths = df_outliers.stack().tolist()
+    all_B_depths = df_normals.iloc[:, 1:].stack().tolist()
+    all_A_depths = df_outliers.iloc[:, 1:].stack().tolist()
+
+    print(all_B_depths)
+    print(len(all_B_depths))
+
     kde(title, dir_name + "/kde", all_B_depths, all_A_depths)
     all_auc_p_r = df_scores["auc_p_r"].values.tolist()
     all_auc_IF_p_r = df_scores["auc_IF_p_r"].values.tolist()
@@ -446,21 +458,22 @@ def contamination_test(time, contamination_percentage, basic_data, contaminating
     return
 
 
-if len(sys.argv == 11):
+if len(sys.argv) == 11:
     distance_matrix = sys.argv[1]
     t = int(sys.argv[2])
     psi = int(sys.argv[3])
     outliers_percentage = int(sys.argv[4])
     l = int(sys.argv[5])
     times = int(sys.argv[6])
-    basic_data = load_dataset(sys.argv[7]).iloc[:, 1:]
-    contaminating_data = load_dataset(sys.argv[8]).iloc[:, 1:]
+    basic_data = load_dataset(sys.argv[7])
+    contaminating_data = load_dataset(sys.argv[8])
     dir_name = sys.argv[9] + str(times) + " times " + str(t) + " trees " + str(
         outliers_percentage) + "% of outliers " + str(psi) + " sub sample " + str(l) + " depth limit"
     title = sys.argv[9] + "\n" + str(times) + " times " + str(t) + " trees " + str(
         outliers_percentage) + "% of outliers " + str(psi) + " sub sample " + str(l) + " depth limit"
-    contamination_percentage = sys.argv[10]
-    contamination_test(contamination_percentage, basic_data, contaminating_data, outliers_percentage)
+    create_dir(dir_name)
+    contamination_percentage = int(sys.argv[10])
+    contamination_test(times, contamination_percentage, basic_data, contaminating_data, outliers_percentage, dir_name)
 
 # python3, distance_matrix=No, t, psi, outliers_percentage, l, time, data1(normal), data2(outliers) optional!, dir_name
 if len(sys.argv) == 10:
