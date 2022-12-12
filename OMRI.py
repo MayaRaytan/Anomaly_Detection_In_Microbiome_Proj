@@ -282,6 +282,52 @@ def create_dir(dir_name):
         os.mkdir(dir_name)
 
 
+def supervided_test(data, outliers_samples, normals_samples, l, t, psi, distance_matrix):
+    # A_depths, B_depths, compare_depths, auc_lst, auc_IF, p, auc_p_r, auc_IF_p_r = [], [], [], [], [], [], [], []
+
+    OF = Forest(0, [])
+    OF.fit(data, psi, l, t, distance_matrix=distance_matrix)
+
+    # Test
+    A_depths, B_depths = test_groups_by_depths(outliers_samples, normals_samples, OF)
+    compare_depths = (sum(A_depths) / len(A_depths)) < (sum(B_depths) / len(B_depths))
+    U1, p = mannwhitneyu(A_depths, B_depths, alternative="less")
+    y_true = len(normals_samples) * [1] + len(outliers_samples) * [0]
+    auc_score = roc_auc_score(y_true, B_depths + A_depths)
+    depths = B_depths + A_depths
+    precision, recall, thresholds = precision_recall_curve(y_true, depths)
+    auc_p_r_score = auc(recall, precision)
+
+    # Isolation Forest test
+    model = IsolationForest(n_estimators=t)
+    model.fit(data.transpose())
+    scores = model.decision_function(data.transpose())  # higher score means more normal
+    auc_IF_score = roc_auc_score(y_true, scores)
+    precision_IF, recall_IF, thresholds_IF = precision_recall_curve(y_true, scores)
+    auc_IF_p_r_score = auc(recall_IF, precision_IF)
+
+    # create_dir(dir_name)
+    # df_normals.to_csv(dir_name + "/normals depths in each iteration.txt", sep='\t')
+    # df_outliers.to_csv(dir_name + "/outliers depths in each iteration.txt", sep='\t')
+    # write_list_to_file(dir_name + "/anomalies depths", A_depths)
+    # write_list_to_file(dir_name + "/normal depths", B_depths)
+    # write_list_to_file(dir_name + "/compare depths", compare_depths)
+    # write_list_to_file(dir_name + "/p values", p)
+    # write_list_to_file(dir_name + "/auc", auc_lst)
+    # write_list_to_file(dir_name + "/auc IF", auc_IF)
+    # write_list_to_file(dir_name + "/auc precision recall", auc_p_r)
+    # write_list_to_file(dir_name + "/auc IF precision recall", auc_IF_p_r)
+
+    # if times > 1:
+    #     A_depths = [item for sublist in A_depths for item in sublist]
+    #     B_depths = [item for sublist in B_depths for item in sublist]
+    # else:
+    #     A_depths = A_depths[0]
+    #     B_depths = B_depths[0]
+    # kde(title + "\ndepths kde", dir_name + "/kde", B_depths, A_depths)
+    # box_plot_hue(auc_p_r, auc_IF_p_r, "auc Precision-Recall OMRI vs Isolation Forest", dir_name)
+    return A_depths, B_depths, compare_depths, p, auc_score, auc_IF_score, auc_p_r_score, auc_IF_p_r_score
+
 def outliers_against_normals(outliers_data, normals_data,l, t, psi, outliers_percentage, distance_matrix, dir_name, times, title):
 
     outliers_data = outliers_data.loc[:, outliers_data.sum() > 0] # filter samples with no data
@@ -294,66 +340,7 @@ def outliers_against_normals(outliers_data, normals_data,l, t, psi, outliers_per
     # l = int(math.log(len(normals_samples)+outliers_count,2)+ 20)
     # print(l)
 
-    A_depths, B_depths, compare_depths, auc_lst, auc_IF, p, auc_p_r, auc_IF_p_r = [], [], [], [], [], [], [], []
-
-    df_outliers = pd.DataFrame()
-    df_normals = pd.DataFrame()
-
-    for i in range(times):
-        outliers_data = outliers_data.sample(n=outliers_count, axis=1)
-        outliers_samples = outliers_data.columns
-        df_outliers["samples"] = outliers_samples
-        df_normals["samples"] = normals_samples
-        data = concat_data_frames([normals_data, outliers_data], 1)
-        data = relative_abundence(data)
-
-        OF = Forest(0,[])
-        OF.fit(data, psi, l,t, distance_matrix=distance_matrix)
-
-        # Test
-        now_A_depths, now_B_depths = test_groups_by_depths(outliers_samples,normals_data, OF)
-        df_normals[str(i)] = now_B_depths
-        df_outliers[str(i)] = now_A_depths
-        A_depths.append(now_A_depths)
-        B_depths.append(now_B_depths)
-        cd = (sum(now_A_depths) / len(now_A_depths)) < (sum(now_B_depths) / len(now_B_depths))
-        compare_depths.append(cd)
-        U1, now_p = mannwhitneyu(now_A_depths, now_B_depths, alternative="less")
-        p.append(now_p)
-        y_true = len(normals_samples) * [1] + len(outliers_samples) * [0]
-        auc_lst.append(roc_auc_score(y_true, now_B_depths + now_A_depths))
-        depths = now_B_depths + now_A_depths
-        precision, recall, thresholds = precision_recall_curve(y_true, depths)
-        auc_p_r.append(auc(recall, precision))
-
-        # Isolation Forest test
-        model = IsolationForest(n_estimators=t)
-        model.fit(data.transpose())
-        scores = model.decision_function(data.transpose())  # higher score means more normal
-        auc_IF.append(roc_auc_score(y_true, scores))
-        precision_IF, recall_IF, thresholds_IF = precision_recall_curve(y_true, scores)
-        auc_IF_p_r.append(auc(recall_IF, precision_IF))
-
-    create_dir(dir_name)
-    df_normals.to_csv(dir_name + "/normals depths in each iteration.txt", sep='\t')
-    df_outliers.to_csv(dir_name + "/outliers depths in each iteration.txt", sep='\t')
-    write_list_to_file(dir_name + "/anomalies depths", A_depths)
-    write_list_to_file(dir_name + "/normal depths", B_depths)
-    write_list_to_file(dir_name + "/compare depths", compare_depths)
-    write_list_to_file(dir_name + "/p values", p)
-    write_list_to_file(dir_name + "/auc", auc_lst)
-    write_list_to_file(dir_name + "/auc IF", auc_IF)
-    write_list_to_file(dir_name + "/auc precision recall", auc_p_r)
-    write_list_to_file(dir_name + "/auc IF precision recall", auc_IF_p_r)
-
-    if times > 1:
-        A_depths = [item for sublist in A_depths for item in sublist]
-        B_depths = [item for sublist in B_depths for item in sublist]
-    else:
-        A_depths = A_depths[0]
-        B_depths = B_depths[0]
-    kde(title + "\ndepths kde", dir_name + "/kde",B_depths, A_depths)
-    box_plot_hue(auc_p_r, auc_IF_p_r, "auc Precision-Recall OMRI vs Isolation Forest", dir_name)
+    A_depths, B_depths, compare_depths, p, auc_lst, auc_IF, auc_p_r, auc_IF_p_r = supervided_test(outliers_data, normals_data,l, t, psi, outliers_percentage, distance_matrix, dir_name, times, title)
     return A_depths, B_depths, compare_depths, p, auc_lst, auc_IF, auc_p_r, auc_IF_p_r
 
 
@@ -385,8 +372,97 @@ def unsupervised_test(times, data, psi, l, t, distance_matrix, dir_name):
     kde(title, dir_name + "/kde", now_B_depths, A_depths)  # A_depths = []
 
 
+def contamination_test(time, contamination_percentage, basic_data, contaminating_data, outliers_percentage_sample):
 
-# python3, distance_matrix=None, t, psi, outliers_percentage, l, time, data1(normal), data2(outliers) optional!, dir_name
+    # filter to common features
+    features_intersection = pd.Series(list(set(basic_data["#OTU ID"]).intersection(set(contaminating_data["#OTU ID"]))))
+    basic_data = basic_data[basic_data["#OTU ID"].isin(features_intersection)]
+    contaminating_data = contaminating_data[contaminating_data["#OTU ID"].isin(features_intersection)]
+
+    # drop features
+    basic_data = basic_data.iloc[:, 1:]
+    contaminating_data = contaminating_data.iloc[:, 1:]
+
+    # relative abundance
+    basic_data = relative_abundence(basic_data)
+    contaminating_data = relative_abundence(contaminating_data)
+
+    df_outliers = pd.DataFrame()
+    df_normals = pd.DataFrame()
+    df_scores = pd.DataFrame()
+
+    for i in range(times):
+
+        # sample outliers
+        outliers_count = int((outliers_percentage_sample * len(basic_data.columns)) / (100 - outliers_percentage_sample))
+        samples_intersection = pd.Series(list(set(basic_data.columns).intersection(set(contaminating_data.columns))))
+        contaminating_data = contaminating_data[samples_intersection]
+        contaminating_data = contaminating_data.sample(n=outliers_count, axis=1)
+
+        # contaminate data
+        helper_contaminating = (1 - (contamination_percentage / 100)) * basic_data[contaminating_data.columns]
+        contaminating_data = contaminating_data.reset_index(drop=True)
+        helper_contaminating += (contamination_percentage / 100) * contaminating_data
+
+        # drop contaminated samples from basic data
+        samples_intersection = pd.Series(list(set(basic_data.columns).intersection(set(helper_contaminating.columns))))
+        a = basic_data.columns.difference(samples_intersection)
+        basic_data = basic_data[a]
+
+        normals_samples = basic_data.columns
+        outliers_samples = helper_contaminating.outliers
+        df_outliers["samples"] = outliers_samples
+        df_normals["samples"] = normals_samples
+        data = concat_data_frames([basic_data, helper_contaminating], 1)
+        data = relative_abundence(data)
+
+        A_depths, B_depths, compare_depths, p, auc_score, auc_IF, auc_p_r, auc_IF_p_r = supervided_test(data, outliers_samples, normals_samples, l, t, psi, distance_matrix)
+
+        df_normals[str(i)] = B_depths
+        df_outliers[str(i)] = A_depths
+        df_scores = df_scores.concat([df_scores.DataFrame([p], columns=['p'])])
+        df_scores = df_scores.concat([df_scores.DataFrame([auc], columns=['auc'])])
+        df_scores = df_scores.concat([df_scores.DataFrame([auc_IF], columns=['auc_IF'])])
+        df_scores = df_scores.concat([df_scores.DataFrame([auc_p_r], columns=['auc_p_r'])])
+        df_scores = df_scores.concat([df_scores.DataFrame([auc_IF_p_r], columns=['auc_IF_p_r'])])
+        df_scores = df_scores.concat([df_scores.DataFrame([compare_depths], columns=['compare_depths'])])
+        # df_scores[p] = p
+        # df_scores[auc_IF] = auc_IF
+        # df_scores[auc] = auc
+        # df_scores[auc_p_r] = auc_p_r
+        # df_scores[auc_IF_p_r] = auc_IF_p_r
+        # df_scores[compare_depths] = compare_depths
+
+    df_normals.to_csv(dir_name + "/normals depths in each iteration.txt", sep='\t')
+    df_outliers.to_csv(dir_name + "/outliers depths in each iteration.txt", sep='\t')
+    df_scores.to_csv(dir_name + "/scores.txt", sep='\t')
+
+    all_A_depths = df_normals.stack().tolist()
+    all_B_depths = df_outliers.stack().tolist()
+    kde(title, dir_name + "/kde", all_B_depths, all_A_depths)
+    all_auc_p_r = df_scores["auc_p_r"].values.tolist()
+    all_auc_IF_p_r = df_scores["auc_IF_p_r"].values.tolist()
+    box_plot_hue(all_auc_p_r, all_auc_IF_p_r, "auc Precision-Recall OMRI vs Isolation Forest", dir_name)
+    return
+
+
+if len(sys.argv == 11):
+    distance_matrix = sys.argv[1]
+    t = int(sys.argv[2])
+    psi = int(sys.argv[3])
+    outliers_percentage = int(sys.argv[4])
+    l = int(sys.argv[5])
+    times = int(sys.argv[6])
+    basic_data = load_dataset(sys.argv[7]).iloc[:, 1:]
+    contaminating_data = load_dataset(sys.argv[8]).iloc[:, 1:]
+    dir_name = sys.argv[9] + str(times) + " times " + str(t) + " trees " + str(
+        outliers_percentage) + "% of outliers " + str(psi) + " sub sample " + str(l) + " depth limit"
+    title = sys.argv[9] + "\n" + str(times) + " times " + str(t) + " trees " + str(
+        outliers_percentage) + "% of outliers " + str(psi) + " sub sample " + str(l) + " depth limit"
+    contamination_percentage = sys.argv[10]
+    contamination_test(contamination_percentage, basic_data, contaminating_data, outliers_percentage)
+
+# python3, distance_matrix=No, t, psi, outliers_percentage, l, time, data1(normal), data2(outliers) optional!, dir_name
 if len(sys.argv) == 10:
     distance_matrix = sys.argv[1]
     t = int(sys.argv[2])
@@ -411,6 +487,8 @@ elif len(sys.argv) == 8:
     dir_name = sys.argv[7] + " " + str(times) + " times " + str(t) + " trees " + str(psi) + " sub sample " + str(l) + " depth limit"
     create_dir(dir_name)
     unsupervised_test(times, data, psi, l, t, distance_matrix, dir_name)
+
+
 
 
 
