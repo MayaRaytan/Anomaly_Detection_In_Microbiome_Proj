@@ -260,14 +260,14 @@ def box_plot_hue(auc, auc_IF, title, dir_name):
     auc_df = pd.DataFrame()
     auc_df["model"] = ["Omri Tree" for j in range(len(auc))]
     auc_df["auc"] = auc
-    auc_df["y"] = "y"
+    auc_df["y"] = "y1"
     df = pd.concat([df, auc_df], ignore_index=True)
     auc_IF_df = pd.DataFrame()
     auc_IF_df["model"] = ["Isolation Forest" for j in range(len(auc_IF))]
     auc_IF_df["auc"] = auc_IF
-    auc_IF_df["y"] = "y"
+    auc_IF_df["y"] = "y2"
     df = pd.concat([df, auc_IF_df], ignore_index=True)
-
+    print(df)
     # print(df)
     sns.boxplot(data=df, x="auc",y="y", hue="model").set(title=title)
     # plt.axvline(x=0.95, color='g')
@@ -387,58 +387,47 @@ def contamination_test(times, contamination_percentage, basic_data, contaminatin
     basic_data = relative_abundence(basic_data)
     contaminating_data = relative_abundence(contaminating_data)
 
+    samples_intersection = pd.Series(list(set(basic_data.columns).intersection(set(contaminating_data.columns))))
+    contaminating_data = contaminating_data[samples_intersection]
+
+    outliers_count = int((outliers_percentage_sample * len(basic_data.columns)) / (100 - outliers_percentage_sample))
+
     df_outliers = pd.DataFrame()
     df_normals = pd.DataFrame()
     df_scores = pd.DataFrame()
 
-    for i in range(times):
+    # basic_data_org = basic_data.copy(deep=True)
 
+    for i in range(times):
+        basic_data_modify = basic_data
         # sample outliers
-        outliers_count = int((outliers_percentage_sample * len(basic_data.columns)) / (100 - outliers_percentage_sample))
-        samples_intersection = pd.Series(list(set(basic_data.columns).intersection(set(contaminating_data.columns))))
-        contaminating_data = contaminating_data[samples_intersection]
-        contaminating_data = contaminating_data.sample(n=outliers_count, axis=1)
+        contaminating_data_sampled = contaminating_data.sample(n=outliers_count, axis=1)
 
         # contaminate data
-        helper_contaminating = (1 - (contamination_percentage / 100)) * basic_data[contaminating_data.columns]
-        contaminating_data = contaminating_data.reset_index(drop=True)
-        helper_contaminating += (contamination_percentage / 100) * contaminating_data
+        helper_contaminating = (1 - (contamination_percentage / 100)) * basic_data_modify[contaminating_data.columns]
+        contaminating_data_sampled = contaminating_data_sampled.reset_index(drop=True)
+        helper_contaminating += (contamination_percentage / 100) * contaminating_data_sampled
 
         # drop contaminated samples from basic data
-        samples_intersection = pd.Series(list(set(basic_data.columns).intersection(set(helper_contaminating.columns))))
-        a = basic_data.columns.difference(samples_intersection)
-        basic_data = basic_data[a]
+        samples_intersection = pd.Series(list(set(basic_data_modify.columns).intersection(set(helper_contaminating.columns))))
+        a = basic_data_modify.columns.difference(samples_intersection)
+        basic_data_modify = basic_data_modify[a]
 
-        normals_samples = basic_data.columns
+        normals_samples = basic_data_modify.columns
         outliers_samples = helper_contaminating.columns
         df_outliers["samples"] = outliers_samples
         df_normals["samples"] = normals_samples
-        data = concat_data_frames([basic_data, helper_contaminating], 1)
+        data = concat_data_frames([basic_data_modify, helper_contaminating], 1)
         data = relative_abundence(data)
 
         A_depths, B_depths, compare_depths, p, auc_score, auc_IF, auc_p_r, auc_IF_p_r = supervided_test(data, outliers_samples, normals_samples, l, t, psi, distance_matrix)
 
         df_normals[str(i)] = B_depths
         df_outliers[str(i)] = A_depths
-        help = pd.DataFrame([p], columns=['p'])
+        help = pd.DataFrame({"p": [p], "auc": [auc], "auc_IF": [auc_IF], "auc_p_r": [auc_p_r], "auc_IF_p_r": [auc_IF_p_r], "compare_depths": [compare_depths]})
         df_scores = pd.concat([df_scores, help], axis=0)
-        help = pd.DataFrame([auc], columns=['auc'])
-        df_scores = pd.concat([df_scores, help], axis=0)
-        help = pd.DataFrame([auc_IF], columns=['auc_IF'])
-        df_scores = pd.concat([df_scores, help], axis=0)
-        help = pd.DataFrame([auc_p_r], columns=['auc_p_r'])
-        df_scores = pd.concat([df_scores, help], axis=0)
-        help = pd.DataFrame([auc_IF_p_r], columns=['auc_IF_p_r'])
-        df_scores = pd.concat([df_scores, help], axis=0)
-        help = pd.DataFrame([compare_depths], columns=['compare_depths'])
-        df_scores = pd.concat([df_scores, help], axis=0)
-
-        # df_scores[p] = p
-        # df_scores[auc_IF] = auc_IF
-        # df_scores[auc] = auc
-        # df_scores[auc_p_r] = auc_p_r
-        # df_scores[auc_IF_p_r] = auc_IF_p_r
-        # df_scores[compare_depths] = compare_depths
+        # help = pd.DataFrame([auc], columns=['auc'])
+        # df_scores = pd.concat([df_scores, help], axis=0)
 
 
     df_normals.to_csv(dir_name + "/normals depths in each iteration.txt", sep='\t')
@@ -447,13 +436,10 @@ def contamination_test(times, contamination_percentage, basic_data, contaminatin
 
     all_B_depths = df_normals.iloc[:, 1:].stack().tolist()
     all_A_depths = df_outliers.iloc[:, 1:].stack().tolist()
-
-    print(all_B_depths)
-    print(len(all_B_depths))
-
     kde(title, dir_name + "/kde", all_B_depths, all_A_depths)
     all_auc_p_r = df_scores["auc_p_r"].values.tolist()
     all_auc_IF_p_r = df_scores["auc_IF_p_r"].values.tolist()
+    print(all_auc_p_r)
     box_plot_hue(all_auc_p_r, all_auc_IF_p_r, "auc Precision-Recall OMRI vs Isolation Forest", dir_name)
     return
 
@@ -467,7 +453,7 @@ if len(sys.argv) == 11:
     times = int(sys.argv[6])
     basic_data = load_dataset(sys.argv[7])
     contaminating_data = load_dataset(sys.argv[8])
-    dir_name = sys.argv[9] + str(times) + " times " + str(t) + " trees " + str(
+    dir_name = sys.argv[9] + " " + str(times) + " times " + str(t) + " trees " + str(
         outliers_percentage) + "% of outliers " + str(psi) + " sub sample " + str(l) + " depth limit"
     title = sys.argv[9] + "\n" + str(times) + " times " + str(t) + " trees " + str(
         outliers_percentage) + "% of outliers " + str(psi) + " sub sample " + str(l) + " depth limit"
