@@ -375,6 +375,34 @@ def unsupervised_test(times, data, psi, l, t, distance_matrix, dir_name):
     #test
     kde(title, dir_name + "/kde", now_B_depths, A_depths)  # A_depths = []
 
+def heatmap_auc_scores(all_auc, all_auc_IF, all_auc_p_r, all_auc_IF_p_r):
+    all_auc = pd.pivot_table(all_auc, values="auc", index="psi percentage", columns="outliers percentage")
+    all_auc_IF = pd.pivot_table(all_auc_IF, values="auc_IF", index="psi percentage", columns="outliers percentage")
+    all_auc_p_r = pd.pivot_table(all_auc_p_r, values="auc_p_r", index="psi percentage", columns="outliers percentage")
+    all_auc_IF_p_r = pd.pivot_table(all_auc_IF_p_r, values="auc_IF_p_r", index="psi percentage", columns="outliers percentage")
+
+    f, axs = plt.subplots(2, 2, sharex=True, sharey=True)
+
+    g1 = sns.heatmap(all_auc, annot=True, cmap="YlGnBu", cbar=False, ax=axs[0,0])
+    g1.set_xlabel('')
+    g2 = sns.heatmap(all_auc_IF, annot=True, cmap="YlGnBu", cbar=False, ax=axs[0,1])
+    g2.set_xlabel('')
+    g2.set_ylabel('')
+    g3 = sns.heatmap(all_auc_p_r, annot=True, cmap="YlGnBu", cbar=False, ax=axs[1,0])
+    g4 = sns.heatmap(all_auc_IF_p_r, annot=True, cmap="YlGnBu", cbar=False, ax=axs[1,1])
+    g4.set_ylabel('')
+
+    axs[0,0].set_title("auc")
+    axs[0,1].set_title("auc IF")
+    axs[1,0].set_title("auc precision recall")
+    axs[1,1].set_title("auc IF precision recal")
+
+    plt.tight_layout()
+    plt.savefig("AUC scores")
+    plt.close()
+    plt.figure().clear()
+    plt.cla()
+
 
 def contamination_test(times, contamination_percentage, basic_data, contaminating_data, outliers_percentage_sample, psi, l, dir_name, different_sample):
 
@@ -399,6 +427,9 @@ def contamination_test(times, contamination_percentage, basic_data, contaminatin
 
     df_outliers = pd.DataFrame()
     df_normals = pd.DataFrame()
+    df_outliers_with_psi_outliers = pd.DataFrame()
+    df_normals_with_psi_outliers = pd.DataFrame()
+
     df_scores = pd.DataFrame()
     df_auc = pd.DataFrame()
     df_auc_IF = pd.DataFrame()
@@ -438,6 +469,11 @@ def contamination_test(times, contamination_percentage, basic_data, contaminatin
         df_normals[str(i)] = B_depths
         df_outliers[str(i)] = A_depths
 
+        help = pd.DataFrame({"psi percentage": psi, "outliers percentage": outliers_percentage, "normals depths": B_depths})
+        df_normals_with_psi_outliers = pd.concat([df_normals_with_psi_outliers, help], axis=0)
+        help = pd.DataFrame({"psi percentage": psi, "outliers percentage": outliers_percentage, "outliers depths": A_depths})
+        df_outliers_with_psi_outliers = pd.concat([df_outliers_with_psi_outliers, help], axis=0)
+
         help = pd.DataFrame({"p": [p], "auc": [auc_score], "auc_IF": [auc_IF], "auc_p_r": [auc_p_r], "auc_IF_p_r": [auc_IF_p_r], "compare_depths": [compare_depths]})
         df_scores = pd.concat([df_scores, help], axis=0)
         help = pd.DataFrame({"psi percentage": psi, "outliers percentage": outliers_percentage, "auc": [auc_score]})
@@ -456,13 +492,12 @@ def contamination_test(times, contamination_percentage, basic_data, contaminatin
 
     all_B_depths = df_normals.iloc[:, 1:].stack().tolist()
     all_A_depths = df_outliers.iloc[:, 1:].stack().tolist()
-    kde(title, dir_name + "/kde", all_B_depths, all_A_depths)
+    # kde(title, dir_name + "/kde", all_B_depths, all_A_depths)
 
-    all_auc_p_r = df_auc_p_r["auc_p_r"]
-    all_auc_IF_p_r = df_auc_IF_p_r["auc_IF_p_r"]
-
-    box_plot_hue(all_auc_p_r, all_auc_IF_p_r, "auc Precision-Recall OMRI vs Isolation Forest", dir_name)
-    return all_A_depths, all_B_depths, df_auc, df_auc_IF, df_auc_p_r, df_auc_IF_p_r
+    # all_auc_p_r = df_auc_p_r["auc_p_r"]
+    # all_auc_IF_p_r = df_auc_IF_p_r["auc_IF_p_r"]
+    # box_plot_hue(all_auc_p_r, all_auc_IF_p_r, "auc Precision-Recall OMRI vs Isolation Forest", dir_name)
+    return df_outliers_with_psi_outliers, df_normals_with_psi_outliers, df_auc, df_auc_IF, df_auc_p_r, df_auc_IF_p_r
 
 # data must contain features column, under the name: "#OTU ID"
 if len(sys.argv) == 12:
@@ -511,6 +546,8 @@ if len(sys.argv) == 10:
 #     create_dir(dir_name)
 #     unsupervised_test(times, data, psi, l, t, distance_matrix, dir_name)
 
+
+
 # matrix maker for this parameters: psis = [10, 30, 50], outliers_percentages = [1,3,5]
 elif len(sys.argv) == 8:
     distance_matrix = sys.argv[1]
@@ -526,7 +563,8 @@ elif len(sys.argv) == 8:
     # basic data and contaminating data contains different sample or not
     different_sample = sys.argv[7]
 
-    all_A_depths, all_B_depths = [],[]
+    all_A_depths = pd.DataFrame()
+    all_B_depths = pd.DataFrame()
     all_auc = pd.DataFrame()
     all_auc_IF = pd.DataFrame()
     all_auc_p_r = pd.DataFrame()
@@ -536,47 +574,52 @@ elif len(sys.argv) == 8:
             title_help = str(times) + " times " + str(contamination_percentage) + "% contamination " + str(t) + " trees " + str(
                 outliers_percentage) + "% of outliers " + str(psi_perc) + "% sub sample " + str(l) + " depth limit"
 
+            create_dir(name)
             dir_name = name + " " + title_help
             title = name + "\n" + title_help
             create_dir(dir_name)
 
             A_depths, B_depths, auc_score, auc_IF, auc_p_r, auc_IF_p_r = contamination_test(times, contamination_percentage, basic_data, contaminating_data, outliers_percentage,
                                psi_perc, l, dir_name, different_sample)
-            all_A_depths.append(A_depths)
-            all_B_depths.append(B_depths)
+            all_A_depths = pd.concat([A_depths, all_A_depths], axis=0)
+            all_B_depths = pd.concat([B_depths, all_B_depths], axis=0)
             all_auc = pd.concat([auc_score, all_auc], axis=0)
             all_auc_IF = pd.concat([auc_IF, all_auc_IF], axis=0)
             all_auc_p_r = pd.concat([auc_p_r, all_auc_p_r], axis=0)
             all_auc_IF_p_r = pd.concat([auc_IF_p_r, all_auc_IF_p_r], axis=0)
 
-    all_auc.to_csv(dir_name + "/all_auc")
-    all_auc_IF.to_csv(dir_name + "/all_auc_IF")
-    all_auc_p_r.to_csv(dir_name + "/all_auc_p_r")
-    all_auc_IF_p_r.to_csv(dir_name + "/all_auc_IF_p_r")
+    all_auc.to_csv(name + "/all_auc")
+    all_auc_IF.to_csv(name + "/all_auc_IF")
+    all_auc_p_r.to_csv(name + "/all_auc_p_r")
+    all_auc_IF_p_r.to_csv(name + "/all_auc_IF_p_r")
 
-    all_auc = pd.pivot_table(all_auc, values="auc", index="psi percentage", columns="outliers percentage")
-    all_auc_IF = pd.pivot_table(all_auc_IF, values="auc_IF", index="psi percentage", columns="outliers percentage")
-    all_auc_p_r = pd.pivot_table(all_auc_p_r, values="auc_p_r", index="psi percentage", columns="outliers percentage")
-    all_auc_IF_p_r = pd.pivot_table(all_auc_IF_p_r, values="auc_IF_p_r", index="psi percentage", columns="outliers percentage")
+    heatmap_auc_scores(all_auc, all_auc_IF, all_auc_p_r, all_auc_IF_p_r)
 
-    f, axs = plt.subplots(2, 2, sharex=True, sharey=True)
 
-    g1 = sns.heatmap(all_auc, annot=True, cmap="YlGnBu", cbar=False, ax=axs[0,0])
-    g1.set_xlabel('')
-    g2 = sns.heatmap(all_auc_IF, annot=True, cmap="YlGnBu", cbar=False, ax=axs[0,1])
-    g2.set_xlabel('')
-    g2.set_ylabel('')
-    g3 = sns.heatmap(all_auc_p_r, annot=True, cmap="YlGnBu", cbar=False, ax=axs[1,0])
-    g4 = sns.heatmap(all_auc_IF_p_r, annot=True, cmap="YlGnBu", cbar=False, ax=axs[1,1])
-    g4.set_ylabel('')
+    # all_A_depths = pd.pivot_table(all_A_depths, values="outliers depths", index="psi percentage", columns="outliers percentage")
+    # all_B_depths = pd.pivot_table(all_B_depths, values="normals depths", index="psi percentage", columns="outliers percentage")
 
-    axs[0,0].set_title("auc")
-    axs[0,1].set_title("auc IF")
-    axs[1,0].set_title("auc precision recall")
-    axs[1,1].set_title("auc IF precision recal")
 
+    f, axs = plt.subplots(3, 3, sharex=True, sharey=True)
+
+    for i in range(len(psis)):
+        for j in range(len(outliers_percentages)):
+            sns.kdeplot(data=all_A_depths[(all_A_depths['outliers percentage'] == outliers_percentages[j]) & (all_A_depths['psi percentage'] == psis[i])]["outliers depths"],
+                        label='outliers', ax=axs[i,j])
+            sns.kdeplot(data=all_B_depths[(all_B_depths["outliers percentage"] == outliers_percentages[j]) & (all_B_depths["psi percentage"] == psis[i])]["normals depths"],
+                        label='normals', ax=axs[i, j])
+
+
+    # g2 = sns.heatmap(all_auc_IF, annot=True, cmap="YlGnBu", cbar=False, ax=axs[0,1])
+    # for i in range(len(psis)):
+    #     for j in range(len(outliers_percentages)):
+    #         sns.kdeplot(data=all_A_depths[3*i + j], label='outliers',ax=axs[i,j])
+    #         sns.kdeplot(data=all_B_depths[3*i + j], label='normals', ax=axs[i,j])
+    #
+    #         plt.xlabel("depths")
+    plt.legend()
     plt.tight_layout()
-    plt.savefig("AUC scores")
+    plt.savefig("kde depths")
     plt.close()
     plt.figure().clear()
     plt.cla()
