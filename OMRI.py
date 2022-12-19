@@ -606,18 +606,23 @@ elif len(sys.argv) == 8:
         for j in range(len(outliers_percentages)):
             sns.kdeplot(data=all_A_depths[(all_A_depths['outliers percentage'] == outliers_percentages[j]) & (all_A_depths['psi percentage'] == psis[i])]["outliers depths"],
                         label='outliers', ax=axs[i,j])
+
             sns.kdeplot(data=all_B_depths[(all_B_depths["outliers percentage"] == outliers_percentages[j]) & (all_B_depths["psi percentage"] == psis[i])]["normals depths"],
                         label='normals', ax=axs[i, j])
+    for i in range(3):
+        plt.setp(axs[-1, i], xlabel=str(outliers_percentages[i]))
+        plt.setp(axs[i, 0], ylabel=str(psis[i]))
+            # if i == 2:
+            #     plt.xlabel(str(outliers_percentages[j]))
+            # if j == 0:
+            #     plt.ylabel(str(psis[i]))
 
-
-    # g2 = sns.heatmap(all_auc_IF, annot=True, cmap="YlGnBu", cbar=False, ax=axs[0,1])
-    # for i in range(len(psis)):
-    #     for j in range(len(outliers_percentages)):
-    #         sns.kdeplot(data=all_A_depths[3*i + j], label='outliers',ax=axs[i,j])
-    #         sns.kdeplot(data=all_B_depths[3*i + j], label='normals', ax=axs[i,j])
-    #
-    #         plt.xlabel("depths")
-    plt.legend()
+    # plt.legend()
+    # f.supxlabel("outliers percentage")
+    # f.supylabel("psi percentage")
+    f.text(0.5, 0.04, "outliers percentage", ha='center')
+    f.text(0.04, 0.5, "psi percentage", va='center', rotation='vertical')
+    f.legend(axs)
     plt.tight_layout()
     plt.savefig("kde depths")
     plt.close()
