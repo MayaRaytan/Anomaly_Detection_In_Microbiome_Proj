@@ -403,6 +403,32 @@ def heatmap_auc_scores(all_auc, all_auc_IF, all_auc_p_r, all_auc_IF_p_r):
     plt.figure().clear()
     plt.cla()
 
+def kde(all_A_depths, all_B_depths, outliers_percentages, psis):
+    f, axs = plt.subplots(3, 3, sharex=True, sharey=True)
+
+    for i in range(len(psis)):
+        for j in range(len(outliers_percentages)):
+            sns.kdeplot(data=all_B_depths[(all_B_depths["outliers percentage"] == outliers_percentages[j]) & (all_B_depths["psi percentage"] == psis[i])]["normals depths"],
+                        label='normals', ax=axs[i, j])
+            sns.kdeplot(data=all_A_depths[(all_A_depths['outliers percentage'] == outliers_percentages[j]) & (all_A_depths['psi percentage'] == psis[i])]["outliers depths"],
+                        label='outliers', ax=axs[i,j])
+
+    # Add superlabels
+    f.suptitle("KDE", x=0.5, y=0.995, fontsize=11)
+    f.text(0.5, 0.02, 'outliers percentage', ha='center', va='center')
+    f.text(0.015, 0.5, 'psi percentage', ha='center', va='center', rotation='vertical')
+    f.subplots_adjust(top=0.85, bottom=0.1, left=0.1, right=0.8, hspace=0.4, wspace=0.4)
+
+    # Add labels to the x-axis and y-axis of each subplot
+    for i in range(3):
+        axs[-1, i].set_xlabel(str(outliers_percentages[i]))
+        axs[i, 0].set_ylabel(str(psis[i]))
+
+    plt.tight_layout()
+    plt.savefig("kde depths")
+    plt.close()
+    plt.figure().clear()
+    plt.cla()
 
 def contamination_test(times, contamination_percentage, basic_data, contaminating_data, outliers_percentage_sample, psi, l, dir_name, different_sample):
 
@@ -548,6 +574,7 @@ if len(sys.argv) == 10:
 
 
 
+
 # matrix maker for this parameters: psis = [10, 30, 50], outliers_percentages = [1,3,5]
 elif len(sys.argv) == 8:
     distance_matrix = sys.argv[1]
@@ -595,39 +622,8 @@ elif len(sys.argv) == 8:
 
     heatmap_auc_scores(all_auc, all_auc_IF, all_auc_p_r, all_auc_IF_p_r)
 
+    kde(all_A_depths, all_B_depths, outliers_percentages, psis)
 
-    # all_A_depths = pd.pivot_table(all_A_depths, values="outliers depths", index="psi percentage", columns="outliers percentage")
-    # all_B_depths = pd.pivot_table(all_B_depths, values="normals depths", index="psi percentage", columns="outliers percentage")
-
-
-    f, axs = plt.subplots(3, 3, sharex=True, sharey=True)
-
-    for i in range(len(psis)):
-        for j in range(len(outliers_percentages)):
-            sns.kdeplot(data=all_A_depths[(all_A_depths['outliers percentage'] == outliers_percentages[j]) & (all_A_depths['psi percentage'] == psis[i])]["outliers depths"],
-                        label='outliers', ax=axs[i,j])
-
-            sns.kdeplot(data=all_B_depths[(all_B_depths["outliers percentage"] == outliers_percentages[j]) & (all_B_depths["psi percentage"] == psis[i])]["normals depths"],
-                        label='normals', ax=axs[i, j])
-    for i in range(3):
-        plt.setp(axs[-1, i], xlabel=str(outliers_percentages[i]))
-        plt.setp(axs[i, 0], ylabel=str(psis[i]))
-            # if i == 2:
-            #     plt.xlabel(str(outliers_percentages[j]))
-            # if j == 0:
-            #     plt.ylabel(str(psis[i]))
-
-    # plt.legend()
-    # f.supxlabel("outliers percentage")
-    # f.supylabel("psi percentage")
-    f.text(0.5, 0.04, "outliers percentage", ha='center')
-    f.text(0.04, 0.5, "psi percentage", va='center', rotation='vertical')
-    f.legend(axs)
-    plt.tight_layout()
-    plt.savefig("kde depths")
-    plt.close()
-    plt.figure().clear()
-    plt.cla()
 
 
 
