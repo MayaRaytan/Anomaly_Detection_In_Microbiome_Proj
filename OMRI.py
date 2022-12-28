@@ -156,37 +156,37 @@ def test_groups_by_depths(A, B, OF):
         B_depths.append(average_depth(normal_sample, OF))
     return A_depths, B_depths
 
-
-def kde(title, file_name, B_depths, A_depths=[]):
-    if (A_depths != []) and (type(A_depths[0]) == list):
-        all_A = []
-        for lst in A_depths:
-            for m in lst:
-                all_A.append(m)
-    else:
-        all_A = A_depths
-    if type(B_depths[0]) == list:
-        all_B = []
-        for lst in B_depths:
-            for m in lst:
-                all_B.append(m)
-    else:
-        all_B = B_depths
-
-    if all_A == []:
-        sns.kdeplot(data=B_depths)
-    else:
-        sns.kdeplot(data=all_A, label='outliers')
-        sns.kdeplot(data=all_B, label='normals')
-        plt.legend()
-
-    plt.title(title)
-    plt.xlabel("depths")
-    plt.tight_layout()
-    plt.savefig(file_name, bbox_inches='tight')
-    plt.close()
-    plt.figure().clear()
-    plt.cla()
+#
+# def kde(title, file_name, B_depths, A_depths=[]):
+#     if (A_depths != []) and (type(A_depths[0]) == list):
+#         all_A = []
+#         for lst in A_depths:
+#             for m in lst:
+#                 all_A.append(m)
+#     else:
+#         all_A = A_depths
+#     if type(B_depths[0]) == list:
+#         all_B = []
+#         for lst in B_depths:
+#             for m in lst:
+#                 all_B.append(m)
+#     else:
+#         all_B = B_depths
+#
+#     if all_A == []:
+#         sns.kdeplot(data=B_depths)
+#     else:
+#         sns.kdeplot(data=all_A, label='outliers')
+#         sns.kdeplot(data=all_B, label='normals')
+#         plt.legend()
+#
+#     plt.title(title)
+#     plt.xlabel("depths")
+#     plt.tight_layout()
+#     plt.savefig(file_name, bbox_inches='tight')
+#     plt.close()
+#     plt.figure().clear()
+#     plt.cla()
 
 
 def create_data(data):
@@ -375,7 +375,7 @@ def unsupervised_test(times, data, psi, l, t, distance_matrix, dir_name):
     #test
     kde(title, dir_name + "/kde", now_B_depths, A_depths)  # A_depths = []
 
-def heatmap_auc_scores(all_auc, all_auc_IF, all_auc_p_r, all_auc_IF_p_r):
+def heatmap_auc_scores(all_auc, all_auc_IF, all_auc_p_r, all_auc_IF_p_r, dir_name):
     all_auc = pd.pivot_table(all_auc, values="auc", index="psi percentage", columns="outliers percentage")
     all_auc_IF = pd.pivot_table(all_auc_IF, values="auc_IF", index="psi percentage", columns="outliers percentage")
     all_auc_p_r = pd.pivot_table(all_auc_p_r, values="auc_p_r", index="psi percentage", columns="outliers percentage")
@@ -398,12 +398,12 @@ def heatmap_auc_scores(all_auc, all_auc_IF, all_auc_p_r, all_auc_IF_p_r):
     axs[1,1].set_title("auc IF precision recal")
 
     plt.tight_layout()
-    plt.savefig("AUC scores")
+    plt.savefig(dir_name + "/AUC scores")
     plt.close()
     plt.figure().clear()
     plt.cla()
 
-def kde(all_A_depths, all_B_depths, outliers_percentages, psis):
+def kde(all_A_depths, all_B_depths, outliers_percentages, psis, dir_name):
     f, axs = plt.subplots(3, 3, sharex=True, sharey=True)
 
     for i in range(len(psis)):
@@ -424,8 +424,9 @@ def kde(all_A_depths, all_B_depths, outliers_percentages, psis):
         axs[-1, i].set_xlabel(str(outliers_percentages[i]))
         axs[i, 0].set_ylabel(str(psis[i]))
 
+    plt.legend(loc="upper left")
     plt.tight_layout()
-    plt.savefig("kde depths")
+    plt.savefig(dir_name + "/kde depths")
     plt.close()
     plt.figure().clear()
     plt.cla()
@@ -438,8 +439,8 @@ def contamination_test(times, contamination_percentage, basic_data, contaminatin
     contaminating_data = contaminating_data[contaminating_data["#OTU ID"].isin(features_intersection)]
 
     # drop features
-    basic_data = basic_data.iloc[:, 1:]
-    contaminating_data = contaminating_data.iloc[:, 1:]
+    basic_data = basic_data.drop("#OTU ID", axis=1)
+    contaminating_data = contaminating_data.drop("#OTU ID", axis=1)
 
     # drop samples with no data
     basic_data = basic_data.loc[:, basic_data.sum() > 0]
@@ -578,7 +579,7 @@ if len(sys.argv) == 10:
 # matrix maker for this parameters: psis = [10, 30, 50], outliers_percentages = [1,3,5]
 elif len(sys.argv) == 8:
     distance_matrix = sys.argv[1]
-    t = 1
+    t = 50
     psis = [10, 30, 50]
     outliers_percentages = [1,3,5]
     times = int(sys.argv[2])
@@ -602,7 +603,7 @@ elif len(sys.argv) == 8:
                 outliers_percentage) + "% of outliers " + str(psi_perc) + "% sub sample " + str(l) + " depth limit"
 
             create_dir(name)
-            dir_name = name + " " + title_help
+            dir_name = name + "/" + title_help
             title = name + "\n" + title_help
             create_dir(dir_name)
 
@@ -620,9 +621,9 @@ elif len(sys.argv) == 8:
     all_auc_p_r.to_csv(name + "/all_auc_p_r")
     all_auc_IF_p_r.to_csv(name + "/all_auc_IF_p_r")
 
-    heatmap_auc_scores(all_auc, all_auc_IF, all_auc_p_r, all_auc_IF_p_r)
+    heatmap_auc_scores(all_auc, all_auc_IF, all_auc_p_r, all_auc_IF_p_r, name)
 
-    kde(all_A_depths, all_B_depths, outliers_percentages, psis)
+    kde(all_A_depths, all_B_depths, outliers_percentages, psis, name)
 
 
 
